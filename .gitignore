@@ -1,0 +1,18 @@
+# Environment variables — never commit secrets
+.env
+
+# Compiled output
+dist/
+
+# Dependencies
+node_modules/
+
+# Local MCP config (saved database IDs)
+~/.kindle-mcp/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*

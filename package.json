@@ -1,0 +1,44 @@
+{
+  "name": "kindle-mcp",
+  "version": "1.0.3",
+  "description": "MCP server that processes Kindle highlights and generates personalized book memory summaries in Notion",
+  "main": "dist/index.js",
+  "bin": {
+    "kindle-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"const fs=require('fs');const f='dist/index.js';const c=fs.readFileSync(f,'utf8');fs.writeFileSync(f,'#!/usr/bin/env node\\n'+c);fs.chmodSync(f,0o755);\"",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "kindle",
+    "notion",
+    "highlights",
+    "reading",
+    "book-summary",
+    "model-context-protocol"
+  ],
+  "author": "Silvia Castro",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.1",
+    "@notionhq/client": "^2.2.15",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
