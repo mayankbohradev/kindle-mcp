@@ -56,11 +56,21 @@ The tool returns:
 
 Empty colors are omitted. Bookmarks and personal notes are skipped.
 
-## Tool
+## Tools
 
 | Tool | What it does |
 |---|---|
-| `parse_kindle_clippings` | Parses a Kindle HTML notebook export or `My Clippings.txt` and returns highlights grouped by book and color |
+| `list_kindle_books` | Lists books in your Kindle notebook, including uploaded PDFs and EPUBs |
+| `get_kindle_highlights` | Fetches those highlights grouped by color. Pass a title, author, or ASIN, or omit it to fetch every book |
+| `parse_kindle_clippings` | Parses a notebook HTML file or `My Clippings.txt` you already downloaded |
+
+Highlights you make in the Kindle app on uploaded files sync to [read.amazon.com/notebook](https://read.amazon.com/notebook). `list_kindle_books` and `get_kindle_highlights` read that page. Set `KINDLE_COOKIE` to the Cookie header from a browser tab where the notebook is already signed in.
+
+```bash
+npx wrangler secret put KINDLE_COOKIE
+```
+
+If the notebook opens on `read.amazon.in`, also set `KINDLE_HOST=read.amazon.in`. The cookie expires and stays in the Worker secret, not in chat.
 
 ## Local development
 

@@ -5,6 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
+import { getKindleHighlights, listKindleBooks } from "./services/kindleNotebook.js";
 import { parseKindleClippings } from "./tools/parseKindleClippings.js";
 
 const TOOL_DESCRIPTION =
@@ -34,6 +35,26 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       description: TOOL_DESCRIPTION,
       inputSchema: RAW_TEXT_SCHEMA,
     },
+    {
+      name: "list_kindle_books",
+      description:
+        "List books in the signed-in Kindle notebook, including uploaded PDFs and EPUBs. Requires KINDLE_COOKIE in the server environment.",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "get_kindle_highlights",
+      description:
+        "Fetch Kindle notebook highlights grouped by color. Optional query matches title, author, or ASIN. Omit query to fetch every book. Includes highlights made in the Kindle app on uploaded files.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Book title, author, or ASIN. Omit to fetch the whole notebook.",
+          },
+        },
+      },
+    },
   ],
 }));
 
@@ -41,6 +62,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
+    if (name === "list_kindle_books") {
+      return {
+        content: [{ type: "text" as const, text: await listKindleBooks() }],
+      };
+    }
+
+    if (name === "get_kindle_highlights") {
+      const query = (args as { query?: string } | undefined)?.query;
+      return {
+        content: [{ type: "text" as const, text: await getKindleHighlights(query) }],
+      };
+    }
+
     if (name !== "parse_kindle_clippings") {
       return {
         content: [{ type: "text" as const, text: `Unknown tool: ${name}` }],
