@@ -1,5 +1,5 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { parseKindleClippings } from "./tools/parseKindleClippings.js";
 
 const description =
