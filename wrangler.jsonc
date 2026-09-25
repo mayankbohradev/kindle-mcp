@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kindle-mcp",
+  "main": "src/worker.ts",
+  "account_id": "2f5888ab789bb6a430d3699aca0c0699",
+  "compatibility_date": "2026-09-25",
+  "compatibility_flags": ["nodejs_compat"]
+}
