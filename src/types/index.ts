@@ -1,38 +1,18 @@
-export interface KindleHighlight {
+export const HIGHLIGHT_COLORS = ["yellow", "blue", "pink", "orange"] as const;
+
+export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number] | "unknown";
+
+export interface ColoredHighlight {
+  text: string;
+  color: HighlightColor;
+}
+
+export interface KindleBook {
   title: string;
   author: string;
-  highlights: string[];
+  highlights_by_color: Partial<Record<HighlightColor, string[]>>;
 }
 
 export interface ParsedClippings {
-  books: KindleHighlight[];
-}
-
-export interface BookSummary {
-  personal_thesis: string;
-  core_themes: string[];
-  key_ideas: string[];
-  actionable_takeaways: string[];
-  reflection_questions: string[];
-  memory_capsule: string;
-}
-
-export interface GeneratePersonalSummaryInput {
-  title: string;
-  author: string;
-  highlights: string[];
-}
-
-export interface PushToNotionInput {
-  notionDatabaseId: string;
-  summary: BookSummary & {
-    title?: string;
-    author?: string;
-  };
-}
-
-export interface NotionPageResult {
-  id: string;
-  url: string;
-  created_time: string;
+  books: KindleBook[];
 }

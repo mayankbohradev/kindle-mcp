@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { ParsedClippings, KindleHighlight } from "../types/index.js";
+import {
+  ColoredHighlight,
+  HighlightColor,
+  KindleBook,
+  ParsedClippings,
+} from "../types/index.js";
 
 export const ParseKindleClippingsInputSchema = z.object({
   rawText: z.string().min(1, "rawText must not be empty"),
@@ -9,14 +14,40 @@ export type ParseKindleClippingsInput = z.infer<
   typeof ParseKindleClippingsInputSchema
 >;
 
-// ─── Format detection ────────────────────────────────────────────────────────
+const COLOR_ORDER: HighlightColor[] = [
+  "yellow",
+  "blue",
+  "pink",
+  "orange",
+  "unknown",
+];
+
+const COLOR_WORDS: Record<string, HighlightColor> = {
+  yellow: "yellow",
+  blue: "blue",
+  pink: "pink",
+  orange: "orange",
+  amarillo: "yellow",
+  azul: "blue",
+  rosa: "pink",
+  naranja: "orange",
+  gelb: "yellow",
+  blau: "blue",
+  jaune: "yellow",
+  bleu: "blue",
+  rose: "pink",
+  amarelo: "yellow",
+  laranja: "orange",
+};
 
 function isHtmlExport(text: string): boolean {
   const head = text.trimStart().slice(0, 200).toLowerCase();
-  return head.includes("<!doctype") || head.includes("<html") || head.includes('class="booktitle"');
+  return (
+    head.includes("<!doctype") ||
+    head.includes("<html") ||
+    head.includes('class="booktitle"')
+  );
 }
-
-// ─── HTML entity decoder (no external deps) ──────────────────────────────────
 
 function decodeHtmlEntities(text: string): string {
   return text
@@ -32,19 +63,61 @@ function decodeHtmlEntities(text: string): string {
     );
 }
 
+function stripTags(html: string): string {
+  return decodeHtmlEntities(html.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+}
+
 function extractFirstDivByClass(html: string, className: string): string {
   const regex = new RegExp(
     `<div[^>]+class="${className}"[^>]*>([\\s\\S]*?)<\\/div>`,
     "i"
   );
   const match = html.match(regex);
-  return match ? decodeHtmlEntities(match[1].trim()) : "";
+  return match ? stripTags(match[1]) : "";
 }
 
-// ─── HTML export parser ───────────────────────────────────────────────────────
-// Handles the Kindle app "Export Notebook" HTML format.
-// Each highlight is a .noteHeading/.noteText pair.
-// Bookmarks ("Marcador" / "Bookmark") have no text and are skipped.
+function normalizeColor(raw: string | undefined): HighlightColor {
+  if (!raw) return "unknown";
+  return COLOR_WORDS[raw.trim().toLowerCase()] ?? "unknown";
+}
+
+function extractColor(headingHtml: string): HighlightColor {
+  const classMatch = headingHtml.match(/class="highlight_([a-zA-Z]+)"/i);
+  if (classMatch) return normalizeColor(classMatch[1]);
+
+  const text = stripTags(headingHtml);
+  const paren = text.match(/\(\s*([a-zA-Z]+)\s*\)/);
+  if (paren) return normalizeColor(paren[1]);
+
+  return "unknown";
+}
+
+function isBookmark(headingText: string, noteText: string): boolean {
+  return /marcador|bookmark/i.test(headingText) || noteText.length === 0;
+}
+
+function isHighlightHeading(headingHtml: string, headingText: string): boolean {
+  if (/class="highlight_/i.test(headingHtml)) return true;
+  return /highlight|subrayado|destaque|markierung|surlignage|evidenziazione/i.test(
+    headingText
+  );
+}
+
+function groupByColor(highlights: ColoredHighlight[]): KindleBook["highlights_by_color"] {
+  const grouped: KindleBook["highlights_by_color"] = {};
+  for (const highlight of highlights) {
+    const bucket = grouped[highlight.color] ?? [];
+    bucket.push(highlight.text);
+    grouped[highlight.color] = bucket;
+  }
+
+  const ordered: KindleBook["highlights_by_color"] = {};
+  for (const color of COLOR_ORDER) {
+    const items = grouped[color];
+    if (items && items.length > 0) ordered[color] = items;
+  }
+  return ordered;
+}
 
 function parseHtmlExport(html: string): ParsedClippings {
   const title = extractFirstDivByClass(html, "bookTitle");
@@ -52,31 +125,35 @@ function parseHtmlExport(html: string): ParsedClippings {
 
   if (!title) return { books: [] };
 
-  // Pull all noteHeading+noteText pairs in document order
   const pairRegex =
     /<div[^>]+class="noteHeading"[^>]*>([\s\S]*?)<\/div>\s*(?:<div[^>]+class="noteText"[^>]*>([\s\S]*?)<\/div>)?/gi;
 
-  const highlights: string[] = [];
+  const highlights: ColoredHighlight[] = [];
   let match: RegExpExecArray | null;
 
   while ((match = pairRegex.exec(html)) !== null) {
-    const heading = decodeHtmlEntities(match[1] ?? "").trim();
-    const noteText = decodeHtmlEntities(match[2] ?? "").trim();
+    const headingHtml = match[1] ?? "";
+    const headingText = stripTags(headingHtml);
+    const noteText = stripTags(match[2] ?? "");
 
-    // Skip bookmarks — they have no extractable highlight text
-    const isBoomark =
-      /marcador|bookmark/i.test(heading) || noteText.length === 0;
-    if (isBoomark) continue;
+    if (isBookmark(headingText, noteText)) continue;
+    if (!isHighlightHeading(headingHtml, headingText)) continue;
 
-    highlights.push(noteText);
+    highlights.push({ text: noteText, color: extractColor(headingHtml) });
   }
 
   if (highlights.length === 0) return { books: [] };
 
-  return { books: [{ title, author: author || "Unknown Author", highlights }] };
+  return {
+    books: [
+      {
+        title,
+        author: author || "Unknown Author",
+        highlights_by_color: groupByColor(highlights),
+      },
+    ],
+  };
 }
-
-// ─── Plain-text My Clippings.txt parser ──────────────────────────────────────
 
 const CLIPPING_SEPARATOR = "==========";
 
@@ -98,7 +175,10 @@ function parsePlainTextClippings(rawText: string): ParsedClippings {
     .map((block) => block.trim())
     .filter((block) => block.length > 0);
 
-  const bookMap = new Map<string, KindleHighlight>();
+  const bookMap = new Map<
+    string,
+    { title: string; author: string; highlights: ColoredHighlight[] }
+  >();
 
   for (const clipping of clippings) {
     const lines = clipping
@@ -109,10 +189,16 @@ function parsePlainTextClippings(rawText: string): ParsedClippings {
     if (lines.length < 3) continue;
 
     const headerLine = lines[0];
-    // lines[1] is metadata (location, date) — skip
+    const metaLine = lines[1];
     const highlightText = lines.slice(2).join(" ").trim();
 
     if (!highlightText) continue;
+    if (/bookmark|marcador/i.test(metaLine) && !/highlight|subrayado|destaque|markierung|surlignage/i.test(metaLine)) {
+      continue;
+    }
+    if (/^\s*-\s*your note\b/i.test(metaLine) || /\bnote\b/i.test(metaLine) && !/highlight/i.test(metaLine)) {
+      continue;
+    }
 
     const { title, author } = parseAuthorAndTitle(headerLine);
     const key = normalizeKey(title, author);
@@ -121,13 +207,17 @@ function parsePlainTextClippings(rawText: string): ParsedClippings {
       bookMap.set(key, { title, author, highlights: [] });
     }
 
-    bookMap.get(key)!.highlights.push(highlightText);
+    bookMap.get(key)!.highlights.push({ text: highlightText, color: "unknown" });
   }
 
-  return { books: Array.from(bookMap.values()) };
+  return {
+    books: Array.from(bookMap.values()).map((bucket) => ({
+      title: bucket.title,
+      author: bucket.author,
+      highlights_by_color: groupByColor(bucket.highlights),
+    })),
+  };
 }
-
-// ─── Public entry point ───────────────────────────────────────────────────────
 
 export function parseKindleClippings(
   input: ParseKindleClippingsInput

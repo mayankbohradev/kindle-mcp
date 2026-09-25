@@ -1,7 +1,7 @@
 {
   "name": "kindle-mcp",
-  "version": "1.0.3",
-  "description": "MCP server that processes Kindle highlights and generates personalized book memory summaries in Notion",
+  "version": "2.0.0",
+  "description": "MCP server that parses Kindle highlight exports and returns them grouped by highlight color",
   "main": "dist/index.js",
   "bin": {
     "kindle-mcp": "dist/index.js"
@@ -19,18 +19,14 @@
   "keywords": [
     "mcp",
     "kindle",
-    "notion",
     "highlights",
     "reading",
-    "book-summary",
     "model-context-protocol"
   ],
   "author": "Silvia Castro",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.1",
-    "@notionhq/client": "^2.2.15",
-    "dotenv": "^16.4.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
